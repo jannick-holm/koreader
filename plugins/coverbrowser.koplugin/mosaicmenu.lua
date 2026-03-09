@@ -18,6 +18,7 @@ local ProgressWidget = require("ui/widget/progresswidget")
 local ReadCollection = require("readcollection")
 local Size = require("ui/size")
 local TextBoxWidget = require("ui/widget/textboxwidget")
+local TextWidget = require("ui/widget/textwidget")
 local UnderlineContainer = require("ui/widget/container/underlinecontainer")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local VerticalSpan = require("ui/widget/verticalspan")
@@ -312,6 +313,10 @@ local MosaicMenuItem = InputContainer:extend{
     bookinfo_found = false,
     cover_specs = nil,
     has_description = false,
+    -- Kobo-style layout: when set, only this height is used for the cover image;
+    -- the remaining space (self.height - cover_h) shows title and author below.
+    cover_h = nil,
+    _cover_widget = nil, -- reference to the cover FrameContainer, for paintTo()
 }
 
 function MosaicMenuItem:init()
@@ -388,9 +393,12 @@ function MosaicMenuItem:update()
     -- a known file with image / without image, or a not yet known file
     local widget
 
+    -- Kobo-style: cover occupies cover_h; remaining space goes to title/author text.
+    -- When cover_h is nil we fall back to the original full-height behaviour.
+    local cover_h = self.cover_h or self.height
     local dimen = Geom:new{
         w = self.width,
-        h = self.height,
+        h = cover_h,
     }
 
     -- We'll draw a border around cover images, it may not be
@@ -528,19 +536,21 @@ function MosaicMenuItem:update()
                 }
                 image:_render()
                 local image_size = image:getSize()
+                local cover_frame = FrameContainer:new{
+                    width = image_size.w + 2*border_size,
+                    height = image_size.h + 2*border_size,
+                    margin = 0,
+                    padding = 0,
+                    bordersize = border_size,
+                    dim = self.file_deleted,
+                    color = self.file_deleted and Blitbuffer.COLOR_DARK_GRAY or nil,
+                    image,
+                }
                 widget = CenterContainer:new{
                     dimen = dimen,
-                    FrameContainer:new{
-                        width = image_size.w + 2*border_size,
-                        height = image_size.h + 2*border_size,
-                        margin = 0,
-                        padding = 0,
-                        bordersize = border_size,
-                        dim = self.file_deleted,
-                        color = self.file_deleted and Blitbuffer.COLOR_DARK_GRAY or nil,
-                        image,
-                    }
+                    cover_frame,
                 }
+                self._cover_widget = cover_frame
                 -- Let menu know it has some item with images
                 self.menu._has_cover_images = true
                 self._has_cover_image = true
@@ -566,24 +576,28 @@ function MosaicMenuItem:update()
                 elseif self.show_progress_bar then
                     bottom_pad = corner_mark_size - Screen:scaleBySize(2)
                 end
+                local fake_cover = FakeCover:new{
+                    -- reduced width to make it look less squared, more like a book
+                    -- In kobo_style the metadata shown inside FakeCover is suppressed
+                    -- (title/authors are rendered in the text area below instead).
+                    width = math.floor(dimen.w * 7/8),
+                    height = dimen.h,
+                    bordersize = border_size,
+                    filename = self.cover_h and nil or self.text,  -- hide filename when kobo_style
+                    title = (not bookinfo.ignore_meta and not self.cover_h) and bookinfo.title,
+                    authors = (not bookinfo.ignore_meta and not self.cover_h) and bookinfo.authors,
+                    title_add = (not bookinfo.ignore_meta and not self.cover_h) and title_add,
+                    authors_add = (not bookinfo.ignore_meta and not self.cover_h) and authors_add,
+                    book_lang = not bookinfo.ignore_meta and bookinfo.language,
+                    file_deleted = self.file_deleted,
+                    bottom_pad = bottom_pad,
+                    bottom_right_compensate = not self.show_progress_bar and self.do_hint_opened,
+                }
                 widget = CenterContainer:new{
                     dimen = dimen,
-                    FakeCover:new{
-                        -- reduced width to make it look less squared, more like a book
-                        width = math.floor(dimen.w * 7/8),
-                        height = dimen.h,
-                        bordersize = border_size,
-                        filename = self.text,
-                        title = not bookinfo.ignore_meta and bookinfo.title,
-                        authors = not bookinfo.ignore_meta and bookinfo.authors,
-                        title_add = not bookinfo.ignore_meta and title_add,
-                        authors_add = not bookinfo.ignore_meta and authors_add,
-                        book_lang = not bookinfo.ignore_meta and bookinfo.language,
-                        file_deleted = self.file_deleted,
-                        bottom_pad = bottom_pad,
-                        bottom_right_compensate = not self.show_progress_bar and self.do_hint_opened,
-                    }
+                    fake_cover,
                 }
+                self._cover_widget = fake_cover
             end
             -- In case we got a blitbuffer and didn't use it (ignore_cover, wikipedia), free it
             if bookinfo.cover_bb and not cover_bb_used then
@@ -592,6 +606,39 @@ function MosaicMenuItem:update()
             -- So we can draw an indicator if this book has a description
             if bookinfo.description then
                 self.has_description = true
+            end
+            -- Kobo-style: append title + author text area below the cover widget
+            if self.cover_h and self._cover_widget then
+                local meta_title = (not bookinfo.ignore_meta and bookinfo.title) or self.text
+                local meta_authors = not bookinfo.ignore_meta and bookinfo.authors
+                local text_h = self.height - cover_h
+                local h_pad = Screen:scaleBySize(4)
+                local text_w = self.width - 2 * h_pad
+                local title_wg = TextWidget:new{
+                    text = BD.auto(meta_title),
+                    face = Font:getFace("cfont", 15),
+                    max_width = text_w,
+                    bold = true,
+                }
+                local info_vgroup = VerticalGroup:new{
+                    VerticalSpan:new{ width = Screen:scaleBySize(4) },
+                    title_wg,
+                }
+                if meta_authors and meta_authors ~= "" then
+                    -- Show only the first author line when multiple are present
+                    local first_author = meta_authors:match("^([^\n]+)") or meta_authors
+                    local author_wg = TextWidget:new{
+                        text = BD.auto(first_author),
+                        face = Font:getFace("cfont", 13),
+                        max_width = text_w,
+                    }
+                    table.insert(info_vgroup, author_wg)
+                end
+                local text_area = CenterContainer:new{
+                    dimen = Geom:new{ w = self.width, h = text_h },
+                    info_vgroup,
+                }
+                widget = VerticalGroup:new{ widget, text_area }
             end
         else -- bookinfo not found
             if self.init_done then
@@ -611,18 +658,40 @@ function MosaicMenuItem:update()
             if self.file_deleted then -- unless file was deleted (can happen with History)
                 hint = _("(deleted)")
             end
+            local pending_cover = FakeCover:new{
+                width = dimen.w,
+                height = dimen.h,
+                bordersize = border_size,
+                filename = self.cover_h and nil or self.text,
+                filename_add = self.cover_h and nil or ("\n" .. hint),
+                initial_sizedec = 4, -- start with a smaller font when filenames only
+                file_deleted = self.file_deleted,
+            }
             widget = CenterContainer:new{
                 dimen = dimen,
-                FakeCover:new{
-                    width = dimen.w,
-                    height = dimen.h,
-                    bordersize = border_size,
-                    filename = self.text,
-                    filename_add = "\n" .. hint,
-                    initial_sizedec = 4, -- start with a smaller font when filenames only
-                    file_deleted = self.file_deleted,
-                }
+                pending_cover,
             }
+            self._cover_widget = pending_cover
+            -- Kobo-style: show filename as placeholder title below cover
+            if self.cover_h then
+                local text_h = self.height - cover_h
+                local h_pad = Screen:scaleBySize(4)
+                local text_w = self.width - 2 * h_pad
+                local title_wg = TextWidget:new{
+                    text = self.text .. "\n" .. hint,
+                    face = Font:getFace("cfont", 13),
+                    max_width = text_w,
+                    bold = false,
+                }
+                local text_area = CenterContainer:new{
+                    dimen = Geom:new{ w = self.width, h = text_h },
+                    VerticalGroup:new{
+                        VerticalSpan:new{ width = Screen:scaleBySize(4) },
+                        title_wg,
+                    },
+                }
+                widget = VerticalGroup:new{ widget, text_area }
+            end
         end
     end
 
@@ -661,8 +730,14 @@ function MosaicMenuItem:paintTo(bb, x, y)
         self.shortcut_icon:paintTo(bb, x+ix, y+iy)
     end
 
-    -- other paintings are anchored to the sub-widget (cover image)
-    local target =  self[1][1][1]
+    -- other paintings are anchored to the sub-widget (cover image).
+    -- When kobo_style is active we stored a direct reference in _cover_widget
+    -- so we can find the FrameContainer even though the VerticalGroup changed the
+    -- widget tree depth.  Fall back to the original three-level navigation otherwise.
+    local target = self._cover_widget or self[1][1][1]
+    -- In Kobo-style the cover only occupies cover_h of the full item height;
+    -- all vertical positioning of overlays must be relative to the cover area only.
+    local item_cover_h = self.cover_h or self.height
 
     if self.menu.name ~= "collections" -- do not show collection mark in collections
             and ReadCollection:isFileInCollections(self.filepath) then
@@ -682,14 +757,14 @@ function MosaicMenuItem:paintTo(bb, x, y)
     end
 
     if self.do_hint_opened and self.been_opened then
-        -- bottom right corner
+        -- bottom right corner of the cover area
         local ix
         if BD.mirroredUILayout() then
             ix = math.floor((self.width - target.dimen.w)/2)
         else
             ix = self.width - math.ceil((self.width - target.dimen.w)/2) - corner_mark_size
         end
-        local iy = self.height - math.ceil((self.height - target.dimen.h)/2) - corner_mark_size
+        local iy = item_cover_h - math.ceil((item_cover_h - target.dimen.h)/2) - corner_mark_size
         -- math.ceil() makes it looks better than math.floor()
         if self.status == "abandoned" then
             corner_mark = abandoned_mark
@@ -711,7 +786,8 @@ function MosaicMenuItem:paintTo(bb, x, y)
                 pos_x = pos_x + corner_mark_size
             end
         end
-        local pos_y = y + self.height - math.ceil((self.height - target.height) / 2) - corner_mark_size + progress_widget_margin
+        -- Position relative to the cover area height, not the full item height
+        local pos_y = y + item_cover_h - math.ceil((item_cover_h - target.height) / 2) - corner_mark_size + progress_widget_margin
         if self.status == "abandoned" then
             progress_widget.fillcolor = Blitbuffer.COLOR_GRAY_6
         else
@@ -811,7 +887,7 @@ function MosaicMenu:_recalculateDimen()
     end
 
     -- Set our items target size
-    self.item_margin = Screen:scaleBySize(10)
+    self.item_margin = Screen:scaleBySize(8)  -- slightly tighter margin for a cleaner grid
     self.item_height = math.floor((self.inner_dimen.h - self.others_height - (1+self.nb_rows)*self.item_margin) / self.nb_rows)
     self.item_width = math.floor((self.inner_dimen.w - (1+self.nb_cols)*self.item_margin) / self.nb_cols)
     self.item_dimen = Geom:new{
@@ -819,6 +895,12 @@ function MosaicMenu:_recalculateDimen()
         w = self.item_width,
         h = self.item_height
     }
+
+    -- Kobo-style card layout: reserve a text strip at the bottom of each cell for
+    -- the book title and author.  The cover image fills the remaining upper portion.
+    -- Scale with item height so it looks proportional across screen sizes.
+    local text_h = math.max(Screen:scaleBySize(44), math.floor(self.item_height * 0.20))
+    self.cover_h = self.item_height - text_h
 
     -- Create or replace corner_mark if needed
     -- 1/12 (larger) or 1/16 (smaller) of cover looks alright
@@ -917,6 +999,7 @@ function MosaicMenu:_updateItemsBuildUI()
         local item_tmp = MosaicMenuItem:new{
                 height = self.item_height,
                 width = self.item_width,
+                cover_h = self.cover_h, -- Kobo-style: cover-only height within the cell
                 entry = entry,
                 text = getMenuText(entry),
                 show_parent = self.show_parent,

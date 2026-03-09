@@ -88,7 +88,7 @@ function CoverBrowser:init()
         if not BookInfoManager:getSetting("filemanager_display_mode")
             and not BookInfoManager:getSetting("history_display_mode") then
             logger.info("CoverBrowser: setting default display modes")
-            BookInfoManager:saveSetting("filemanager_display_mode", "list_image_meta")
+            BookInfoManager:saveSetting("filemanager_display_mode", "mosaic_image")
             BookInfoManager:saveSetting("history_display_mode", "mosaic_image")
             BookInfoManager:saveSetting("collection_display_mode", "mosaic_image")
         end
@@ -540,9 +540,9 @@ end
 function CoverBrowser.initGrid(menu, display_mode)
     if menu == nil then return end
     if menu.nb_cols_portrait == nil then
-        menu.nb_cols_portrait  = BookInfoManager:getSetting("nb_cols_portrait") or 3
+        menu.nb_cols_portrait  = BookInfoManager:getSetting("nb_cols_portrait") or 2  -- 2 wide columns like Kobo
         menu.nb_rows_portrait  = BookInfoManager:getSetting("nb_rows_portrait") or 3
-        menu.nb_cols_landscape = BookInfoManager:getSetting("nb_cols_landscape") or 4
+        menu.nb_cols_landscape = BookInfoManager:getSetting("nb_cols_landscape") or 3
         menu.nb_rows_landscape = BookInfoManager:getSetting("nb_rows_landscape") or 2
         -- initial List mode files_per_page will be calculated and saved by ListMenu on the first drawing
         menu.files_per_page = BookInfoManager:getSetting("files_per_page")
