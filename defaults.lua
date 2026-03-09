@@ -98,7 +98,7 @@ DKOPTREADER_CONFIG_DOC_DEFAULT_LANG_CODE = "eng",          -- that have filename
 -- crereader font sizes
 -- feel free to add more entries in this list
 DCREREADER_CONFIG_FONT_SIZES = {12, 16, 20, 22, 24, 26, 28, 30, 34, 38, 44},  -- option range from 12 to 44
-DCREREADER_CONFIG_DEFAULT_FONT_SIZE = 22,    -- default font size
+DCREREADER_CONFIG_DEFAULT_FONT_SIZE = 24,    -- default font size (increased from 22 for better readability)
 
 -- crereader margin sizes
 -- horizontal margins {left, right} in (relative) pixels
@@ -171,7 +171,7 @@ DCREREADER_CONFIG_WORD_EXPANSION_SOME = 5,
 DCREREADER_CONFIG_WORD_EXPANSION_MORE = 15,
 
 -- configure "mini" progress bar
-DMINIBAR_CONTAINER_HEIGHT = 14,  -- Larger means more padding at the bottom, at the risk of eating into the last line
+DMINIBAR_CONTAINER_HEIGHT = 16,  -- Larger means more padding at the bottom, at the risk of eating into the last line
 
 -- Normally, KOReader will present file lists sorted in case insensitive manner
 -- when presenting an alphatically sorted list. So the Order is "A, b, C, d".

@@ -57,7 +57,7 @@ local Notification = InputContainer:extend{
     face = Font:getFace("x_smallinfofont"),
     text = _("N/A"),
     margin = Size.margin.default,
-    padding = Size.padding.default,
+    padding = Size.padding.notification, -- generous inner padding for readability
     timeout = 2, -- default to 2 seconds
     _timeout_func = nil,
     toast = true, -- closed on any event, and let the event propagate to next top widget
@@ -113,7 +113,7 @@ function Notification:init()
     local widget_size = text_widget:getSize()
     self.frame = FrameContainer:new{
         background = Blitbuffer.COLOR_WHITE,
-        radius = 0,
+        radius = Size.radius.window, -- rounded corners for a modern toast appearance
         margin = self.margin,
         padding = self.padding,
         CenterContainer:new{

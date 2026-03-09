@@ -51,14 +51,15 @@ local Size = {
         tiny = Screen:scaleBySize(1),
         small = Screen:scaleBySize(2),
         large = Screen:scaleBySize(10),
-        button = Screen:scaleBySize(2),
+        button = Screen:scaleBySize(4),    -- increased from 2 for more comfortable tap targets
         buttontable = Screen:scaleBySize(4),
         fullscreen = Screen:scaleBySize(15),
+        notification = Screen:scaleBySize(8), -- toast notification inner padding
     },
     radius = {
         default = Screen:scaleBySize(2),
-        window = Screen:scaleBySize(7),
-        button = Screen:scaleBySize(7),
+        window = Screen:scaleBySize(10),   -- increased from 7 for a softer, more modern look
+        button = Screen:scaleBySize(10),   -- increased from 7 to match window radius
     },
     line = {
         thin = Screen:scaleBySize(0.5),
@@ -68,15 +69,15 @@ local Size = {
         progress = Screen:scaleBySize(7),
     },
     item = {
-        height_default = Screen:scaleBySize(30),
-        height_big = Screen:scaleBySize(40),
-        height_large = Screen:scaleBySize(50),
+        height_default = Screen:scaleBySize(34), -- increased from 30 for better touch ergonomics
+        height_big = Screen:scaleBySize(44),     -- increased from 40; matches 44pt touch guideline
+        height_large = Screen:scaleBySize(56),   -- increased from 50 for prominent list items
     },
     span = {
         horizontal_default = Screen:scaleBySize(10),
         horizontal_small = Screen:scaleBySize(5),
-        vertical_default = Screen:scaleBySize(2),
-        vertical_large = Screen:scaleBySize(5),
+        vertical_default = Screen:scaleBySize(3),  -- increased from 2 for better visual breathing room
+        vertical_large = Screen:scaleBySize(7),    -- increased from 5 for more spacious layouts
     },
 }
 
